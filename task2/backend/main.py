@@ -213,10 +213,19 @@ async def get_conversation_history(session_id: str):
     """Get conversation history for a session."""
     try:
         context = conversation_engine.get_or_create_context(session_id)
+        
+        # Convert LangChain messages to simple format for API response
+        conversation_history = []
+        for message in context.conversation_history:
+            if hasattr(message, 'content'):
+                conversation_history.append({
+                    "role": "user" if hasattr(message, 'type') and message.type == "human" else "assistant",
+                    "content": message.content
+                })
+        
         return {
             "session_id": session_id,
-            "conversation_history": context.conversation_history,
-            "state": context.state.value,
+            "conversation_history": conversation_history,
             "cart_id": context.cart_id
         }
         

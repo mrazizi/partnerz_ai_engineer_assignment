@@ -1,10 +1,11 @@
 # Shopify Conversational Agent
 
-A multi-turn chatbot that enables customers to search for products and manage their cart through natural conversation, powered by OpenAI GPT-4 and Shopify Storefront API.
+A multi-turn chatbot that enables customers to search for products and manage their cart through natural conversation, powered by OpenAI GPT-4 and LangChain tools with Shopify Storefront API.
 
 ## Features
 
-- **Conversational Product Search**: Natural language product discovery with intelligent slot filling
+- **LangChain Tool-Based Architecture**: Automatic tool calling for product search, cart management, and more
+- **Conversational Product Search**: Natural language product discovery with intelligent tool selection
 - **Multi-turn Conversations**: Context-aware conversations that remember user preferences
 - **Cart Management**: Add/remove items, view cart contents through chat
 - **Smart Recommendations**: LLM-powered product suggestions and alternatives
@@ -17,12 +18,25 @@ A multi-turn chatbot that enables customers to search for products and manage th
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Frontend      │    │   Backend       │    │   Shopify       │
 │   (Streamlit)   │◄──►│   (FastAPI)     │◄──►│   Storefront    │
-│                 │    │                 │    │   API           │
-│   • Chat UI     │    │   • LLM Engine  │    │   • Products    │
-│   • Product     │    │   • Conv. Mgmt  │    │   • Cart        │
-│   • Cart View   │    │   • API Client  │    │   • Search      │
+│                 │    │                 │    │   MCP           │
+│   • Chat UI     │    │   • LangChain   │    │   • Products    │
+│   • Product     │    │   • Tools       │    │   • Cart        │
+│   • Cart View   │    │   • Agent       │    │   • Search      │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
+
+## LangChain Tools
+
+The conversation engine uses LangChain tools for automatic function calling:
+
+- **search_products**: Find products in the store catalog
+- **create_cart**: Create a new shopping cart
+- **add_to_cart**: Add products to the user's cart
+- **view_cart**: Display cart contents and total
+- **remove_from_cart**: Remove items from cart
+- **get_product_details**: Get detailed product information
+
+The LLM automatically selects and calls the appropriate tools based on user intent.
 
 ## Quick Start
 
@@ -161,26 +175,37 @@ Current State + User Response → Next State + Actions
 
 ```
 1. User: "I want a shirt"
-   → Intent: search, Slots: {product_type: "shirt"}
-   → Missing: color, size
-   → Response: "What color and size?"
+   → Tool: search_products("shirt")
+   → Response: "I found 5 shirts. Which one interests you?"
 
-2. User: "Red, size M"
-   → Slots: {product_type: "shirt", color: "red", size: "M"}
-   → Search: "red shirt size M"
-   → Results: 3 matching products
-   → Response: Product list with details
+2. User: "Show me red shirts"
+   → Tool: search_products("red shirt")
+   → Response: "I found 3 red shirts. Here are the details..."
 
-3. User: "Performance Tee"
-   → Intent: selection
-   → Action: Set selected product
-   → Response: "Would you like to add it to cart?"
+3. User: "Add the first one to my cart"
+   → Tool: add_to_cart(product_id="gid://shopify/Product/123")
+   → Response: "Perfect! I've added the red shirt to your cart."
 
-4. User: "Yes please"
-   → Intent: add_to_cart
-   → Action: Add to cart
-   → Response: Confirmation + cart summary
+4. User: "What's in my cart?"
+   → Tool: view_cart()
+   → Response: "Here's what's in your cart: Red Shirt - $29.99"
+
+5. User: "Remove the shirt"
+   → Tool: remove_from_cart(line_item_id="gid://shopify/CartLine/456")
+   → Response: "I've removed the shirt from your cart."
 ```
+
+## How LangChain Tools Work
+
+The conversation engine automatically:
+
+1. **Analyzes user intent** using the LLM
+2. **Selects appropriate tools** based on the user's request
+3. **Calls tools with parameters** extracted from the conversation
+4. **Formats responses** in a natural, conversational way
+5. **Maintains context** across the conversation
+
+This approach eliminates the need for manual intent classification and provides more flexible, natural interactions.
 
 ## API Endpoints
 
@@ -205,7 +230,7 @@ Key configuration options in `backend/config.py`:
 
 ```python
 # LLM Configuration
-DEFAULT_MODEL = "gpt-4-turbo-preview"
+DEFAULT_MODEL = "gpt-4o-mini"
 MAX_TOKENS = 1000
 TEMPERATURE = 0.7
 
@@ -233,7 +258,7 @@ SEARCH_RESULTS_LIMIT = 10
 
 ### Common Issues
 
-1. **Backend not connecting**: Check OpenAI API key and Shopify token
+1. **Backend not connecting**: Check OpenAI API key and Shopify store URL
 2. **No products found**: Verify Shopify store has published products
 3. **Cart errors**: Ensure Storefront API permissions are correct
 4. **Slow responses**: Check OpenAI API quotas and latency
