@@ -80,15 +80,6 @@ def query_rag_system(question: str) -> Dict[str, Any]:
     except Exception as e:
         return {"error": f"Unexpected error: {str(e)}"}
 
-def get_collection_info():
-    """Get collection information."""
-    try:
-        response = requests.get(f"{BACKEND_URL}/info", timeout=10)
-        response.raise_for_status()
-        return response.json()
-    except:
-        return None
-
 def ingest_data():
     """Trigger data ingestion."""
     try:
@@ -113,15 +104,7 @@ def main():
         else:
             st.error("❌ Backend Disconnected")
             st.warning("Please ensure the backend server is running and accessible")
-        
-        # Collection info
-        if backend_connected:
-            with st.expander("Collection Information"):
-                info = get_collection_info()
-                if info:
-                    st.json(info)
-                else:
-                    st.error("Could not retrieve collection information")
+
         
         # Data ingestion
         st.header("Data Management")
@@ -151,9 +134,7 @@ def main():
         "How do I reset my password?",
         "What integrations does Intercom support?",
         "Can I change my billing cycle mid-subscription?",
-        "How can I customize my widget?",
-        "How do I install Intercom on multiple apps?",
-        "Is Grammarly compatible with Intercom?"
+        "How can I customize my widget?"
     ]
     
     cols = st.columns(2)
@@ -192,15 +173,15 @@ def main():
                         st.write("### 💡 Answer")
                         st.write(answer)
                         
-                        # Display sources
+                        # Display sources with toggle
                         if result.get("sources"):
-                            st.write("### 📚 Sources")
-                            for i, source in enumerate(result["sources"], 1):
-                                st.write(f"**Source {i}:**")
-                                st.write(f"Title: {source.get('title', 'No title')}")
-                                st.write(f"URL: {source.get('url', 'No URL')}")
-                                st.write(f"Content: {source.get('content_snippet', 'No content')[:100]}...")
-                                st.write("---")
+                            with st.expander("📚 Sources", expanded=False):
+                                for i, source in enumerate(result["sources"], 1):
+                                    st.write(f"**Source {i}:**")
+                                    st.write(f"Title: {source.get('title', 'No title')}")
+                                    st.write(f"URL: {source.get('url', 'No URL')}")
+                                    st.write(f"Content: {source.get('content_snippet', 'No content')[:100]}...")
+                                    st.write("---")
                     else:
                         st.error("❌ No answer received from the backend")
                         st.write("Raw result:")

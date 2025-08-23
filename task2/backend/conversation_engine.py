@@ -103,6 +103,11 @@ class ConversationEngine:
                     
                     response += "Which one interests you? You can tell me the product name or ID."
                 
+                # Store search results in context for later reference
+                context = self._get_current_context()
+                context.search_results = products
+                context.search_query = query
+                
                 logger.info(f"Search results: {len(products)} products found")
                 return response
                 
@@ -128,16 +133,16 @@ class ConversationEngine:
                 return "I'm having trouble creating a cart. Please try again."
         
         @tool
-        def add_to_cart(product_id: str, quantity: int = 1) -> str:
+        def add_to_cart(product_reference: str, quantity: int = 1) -> str:
             """Add a product to the user's cart. Use this when users want to buy something.
             
             Args:
-                product_id: The product ID or variant ID to add
+                product_reference: Can be a product number from search results (e.g., "3"), product ID, or variant ID
                 quantity: How many to add (default: 1)
             """
             try:
                 logger.info(f"=== ADD TO CART TOOL ===")
-                logger.info(f"Product ID: {product_id}")
+                logger.info(f"Product Reference: {product_reference}")
                 logger.info(f"Quantity: {quantity}")
                 
                 # Get or create cart
@@ -151,8 +156,15 @@ class ConversationEngine:
                 else:
                     cart_id = context.cart_id
                 
+                # Resolve product reference to variant ID
+                variant_id = self._resolve_product_reference(product_reference, context)
+                if not variant_id:
+                    return f"I couldn't find a product matching '{product_reference}'. Could you try again with a product name, number from the search results, or product ID?"
+                
+                logger.info(f"Resolved to variant ID: {variant_id}")
+                
                 # Add to cart
-                result = self.shopify_client.add_to_cart(cart_id, product_id, quantity)
+                result = self.shopify_client.add_to_cart(cart_id, variant_id, quantity)
                 
                 logger.info(f"Added to cart successfully")
                 return f"Perfect! I've added the product to your cart. Is there anything else you'd like to add?"
@@ -172,7 +184,16 @@ class ConversationEngine:
                     return "Your cart is empty. Would you like to search for some products?"
                 
                 cart = self.shopify_client.get_cart(context.cart_id)
-                cart_lines = cart.get("lines", {}).get("edges", [])
+                
+                # Handle different response structures
+                cart_lines = []
+                if "lines" in cart:
+                    if isinstance(cart["lines"], dict) and "edges" in cart["lines"]:
+                        # GraphQL-style response
+                        cart_lines = cart["lines"]["edges"]
+                    elif isinstance(cart["lines"], list):
+                        # Direct array response
+                        cart_lines = cart["lines"]
                 
                 if not cart_lines:
                     return "Your cart is empty. Would you like to search for some products?"
@@ -181,13 +202,26 @@ class ConversationEngine:
                 total = 0.0
                 
                 for line in cart_lines:
-                    node = line["node"]
-                    merchandise = node["merchandise"]
-                    product_title = merchandise["product"]["title"]
-                    variant_title = merchandise["title"]
-                    quantity = node["quantity"]
-                    price = float(merchandise["price"]["amount"])
-                    currency = merchandise["price"]["currencyCode"]
+                    # Handle different line structures
+                    if isinstance(line, dict) and "node" in line:
+                        # GraphQL-style with node
+                        node = line["node"]
+                        merchandise = node.get("merchandise", {})
+                        product_title = merchandise.get("product", {}).get("title", "Unknown Product")
+                        variant_title = merchandise.get("title", "")
+                        quantity = node.get("quantity", 1)
+                        price_data = merchandise.get("price", {})
+                        price = float(price_data.get("amount", 0))
+                        currency = price_data.get("currencyCode", "USD")
+                    else:
+                        # Direct line structure
+                        merchandise = line.get("merchandise", {})
+                        product_title = merchandise.get("product", {}).get("title", "Unknown Product")
+                        variant_title = merchandise.get("title", "")
+                        quantity = line.get("quantity", 1)
+                        price_data = merchandise.get("price", {})
+                        price = float(price_data.get("amount", 0))
+                        currency = price_data.get("currencyCode", "USD")
                     
                     line_total = price * quantity
                     total += line_total
@@ -281,7 +315,7 @@ class ConversationEngine:
         Guidelines:
         - Be friendly, helpful, and conversational
         - When users want to find products, use the search_products tool
-        - When users want to add items to cart, use the add_to_cart tool
+        - When users want to add items to cart, use the add_to_cart tool with the correct product reference
         - When users want to see their cart, use the view_cart tool
         - When users want to remove items, use the remove_from_cart tool
         - When users want product details, use the get_product_details tool
@@ -289,10 +323,17 @@ class ConversationEngine:
         - If users seem lost, offer to help them search for products
         - Always provide clear next steps for users
         
+        IMPORTANT: When users reference products for adding to cart:
+        - If they say "number 3" or "product 3", use "3" as the product_reference
+        - If they mention a product name (like "Ocean Blue Shirt"), use the product name
+        - If they provide a Shopify ID, use that ID directly
+        - The add_to_cart tool will automatically resolve these references to the correct variant IDs
+        - The system uses Shopify's MCP update_cart tool with add_items format
+        
         Available tools:
         - search_products: Find products in the store
         - create_cart: Create a new shopping cart
-        - add_to_cart: Add products to cart
+        - add_to_cart: Add products to cart (handles product numbers, names, or IDs)
         - view_cart: See what's in the cart
         - remove_from_cart: Remove items from cart
         - get_product_details: Get detailed product information
@@ -307,6 +348,73 @@ class ConversationEngine:
         ])
         
         return create_openai_tools_agent(self.llm, self.tools, prompt)
+    
+    def _resolve_product_reference(self, product_reference: str, context: ConversationContext) -> Optional[str]:
+        """Resolve a product reference to a variant ID.
+        
+        Args:
+            product_reference: Can be a number (from search results), product ID, or variant ID
+            context: Current conversation context with search results
+            
+        Returns:
+            Variant ID that can be used for cart operations, or None if not found
+        """
+        try:
+            # Check if it's a number referring to search results
+            if product_reference.isdigit():
+                product_index = int(product_reference) - 1  # Convert to 0-based index
+                if 0 <= product_index < len(context.search_results):
+                    product = context.search_results[product_index]
+                    # Get the first available variant ID
+                    if product.variants and len(product.variants) > 0:
+                        return product.variants[0]['id']
+                    else:
+                        # Fallback: try to get variant by searching for the product
+                        detailed_product = self.shopify_client.get_product_by_id(product.id)
+                        if detailed_product and detailed_product.variants:
+                            return detailed_product.variants[0]['id']
+                return None
+            
+            # Check if it's already a variant ID (starts with gid://shopify/ProductVariant/)
+            if product_reference.startswith("gid://shopify/ProductVariant/"):
+                return product_reference
+            
+            # Check if it's a product ID (starts with gid://shopify/Product/)
+            if product_reference.startswith("gid://shopify/Product/"):
+                # Get product details to find variants
+                detailed_product = self.shopify_client.get_product_by_id(product_reference)
+                if detailed_product and detailed_product.variants:
+                    return detailed_product.variants[0]['id']
+                return None
+            
+            # Try to search by product name/title from current search results
+            for product in context.search_results:
+                if product_reference.lower() in product.title.lower():
+                    if product.variants and len(product.variants) > 0:
+                        return product.variants[0]['id']
+                    else:
+                        # Fallback: get product details
+                        detailed_product = self.shopify_client.get_product_by_id(product.id)
+                        if detailed_product and detailed_product.variants:
+                            return detailed_product.variants[0]['id']
+            
+            # If nothing found, try searching for the product
+            products = self.shopify_client.search_products(product_reference, limit=1)
+            if products and len(products) > 0:
+                product = products[0]
+                if product.variants and len(product.variants) > 0:
+                    return product.variants[0]['id']
+                else:
+                    # Get detailed product info
+                    detailed_product = self.shopify_client.get_product_by_id(product.id)
+                    if detailed_product and detailed_product.variants:
+                        return detailed_product.variants[0]['id']
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error resolving product reference '{product_reference}': {str(e)}")
+            return None
     
     def _get_current_context(self) -> ConversationContext:
         """Get the current conversation context (for tools to access)."""

@@ -212,7 +212,7 @@ class ShopifyStorefrontClient:
         """Create a new cart using Shopify MCP update_cart tool."""
         # Create new cart by calling update_cart without cart_id
         response = self._make_mcp_tool_request("update_cart", {
-            "lines": []  # Empty lines array creates new cart
+            "add_items": []  # Empty add_items array creates new cart
         })
         
         print("=== CREATE CART RESPONSE ===")
@@ -239,8 +239,8 @@ class ShopifyStorefrontClient:
         """Add item to cart using Shopify MCP update_cart tool."""
         arguments = {
             "cart_id": cart_id,
-            "lines": [{
-                "merchandise_id": variant_id,
+            "add_items": [{
+                "product_variant_id": variant_id,
                 "quantity": quantity
             }]
         }
@@ -269,8 +269,8 @@ class ShopifyStorefrontClient:
         """Remove item from cart using Shopify MCP update_cart tool."""
         arguments = {
             "cart_id": cart_id,
-            "lines": [{
-                "line_item_id": line_item_id,
+            "update_items": [{
+                "id": line_item_id,
                 "quantity": 0  # Set quantity to 0 to remove item
             }]
         }

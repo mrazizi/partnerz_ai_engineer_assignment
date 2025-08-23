@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # Configuration
-BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = "http://backend:8000"
 
 # Custom CSS for better styling
 st.markdown("""

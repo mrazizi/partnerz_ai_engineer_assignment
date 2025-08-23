@@ -79,6 +79,49 @@ async def health_check():
         }
 
 
+@app.get("/tools/list")
+async def list_mcp_tools():
+    """List available tools from Shopify Storefront MCP server."""
+    try:
+        # Make MCP tools/list request
+        payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/list",
+            "params": {}
+        }
+        
+        import requests
+        response = requests.post(
+            shopify_client.mcp_endpoint,
+            headers=shopify_client.headers,
+            json=payload,
+            timeout=30
+        )
+        response.raise_for_status()
+        result = response.json()
+        
+        if "error" in result:
+            raise Exception(f"MCP server error: {result['error']}")
+        
+        tools = result.get("result", {}).get("tools", [])
+        
+        return {
+            "success": True,
+            "tools": tools,
+            "count": len(tools),
+            "mcp_endpoint": shopify_client.mcp_endpoint
+        }
+        
+    except Exception as e:
+        logger.error(f"List tools error: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "mcp_endpoint": shopify_client.mcp_endpoint
+        }
+
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat(chat_message: ChatMessage):
     """Main chat endpoint for conversational interactions."""
