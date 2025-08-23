@@ -49,7 +49,7 @@ $$Lift(A, B) = \frac{\text{Transactions containing both A \& B} \cdot \text{Tota
 Combine all candidates into a single pool: $Pool = C_{cf} \cup S_A \cup S_B$.
 Assign a score to each product $P$ in the pool. A weighted scoring function can be used:
 
-$$Score(P) = w_1 \cdot \text{co\_occur\_score}(P, A) + w_2 \cdot \text{sim}(P, A) + w_3 \cdot \max_{B \in C_{cf}} \text{sim}(P, B)$$
+$$Score(P) = w_1 \cdot \text{lift}(P, A) + w_2 \cdot \text{sim}(P, A) + w_3 \cdot \max_{B \in C_{cf}} \text{sim}(P, B)$$
 
 * $w_1, w_2, w_3$ are tunable weights.
 * Filter out product $A$, out-of-stock items, and duplicates.
@@ -61,7 +61,7 @@ $$Score(P) = w_1 \cdot \text{co\_occur\_score}(P, A) + w_2 \cdot \text{sim}(P, A
 | :--- | :--- | :--- |
 | **Click-Through Rate (CTR)** | $\frac{\text{Clicks on Recommendations}}{\text{Impressions of Recommendations}}$ | Measures user engagement with the recommendations. |
 | **Conversion Rate (CVR)** | $\frac{\text{Orders with a Recommended Item}}{\text{Clicks on Recommendations}}$ | Measures the effectiveness of recommendations in driving purchases. |
-| **Coverage** | $\frac{\text{# Products with Recommendations}}{\text{Total # Products}}$ | Measures the percentage of product pages where we can show recommendations. |
+| **Coverage** | $\frac{\text{\# Products with Recommendations}}{\text{Total \# Products}}$ | Measures the percentage of product pages where we can show recommendations. |
 
 ---
 
@@ -78,8 +78,9 @@ $$Score(P) = w_1 \cdot \text{co\_occur\_score}(P, A) + w_2 \cdot \text{sim}(P, A
 * **Priority:** High
 * **Estimate:** 1.5 Weeks
     * **Task 2.1:** Implement the hybrid recommendation logic (candidate generation, scoring, ranking).
-    * **Task 2.2:** Build a simple API endpoint (e.g., `GET /recommendations?product_id=...`) that executes the logic and returns a list of product IDs.
-    * **Task 2.3:** Deploy the service (e.g., via serverless function or container).
+    * **Task 2.2:** Implement an offline job to go through the products and generate a recommendation list of each product. Schedule it using Apache Airflow.
+    * **Task 2.3:** Build a simple API endpoint (e.g., `GET /recommendations?product_id=...`) that retreives returns a list of product IDs.
+    * **Task 2.4:** Deploy the service.
 
 #### Phase 3: Frontend Integration & A/B Testing
 * **Priority:** Medium
