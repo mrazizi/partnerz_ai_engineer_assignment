@@ -100,8 +100,8 @@ async def ingest_data(request: IngestionRequest = None):
         if not data_ingestion_service:
             raise HTTPException(status_code=500, detail="Data ingestion service not initialized")
         
-        json_path = request.json_path if request else None
-        data_ingestion_service.ingest_data(json_path)
+        json_path = request.json_path if request and request.json_path else None
+        await data_ingestion_service.ingest_data_async(json_path)
         
         return IngestionResponse(
             status="success",

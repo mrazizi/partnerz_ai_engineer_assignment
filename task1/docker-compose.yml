@@ -21,7 +21,7 @@ services:
     depends_on:
       - qdrant
     volumes:
-      - ./articles.json:/app/articles.json:ro
+      - ./backend/articles.json:/app/articles.json:ro
 
   frontend:
     build:

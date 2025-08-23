@@ -20,6 +20,6 @@ class Config:
     VECTOR_SIZE = int(os.getenv("VECTOR_SIZE", "1536"))
     
     # Data Configuration
-    ARTICLES_JSON_PATH = os.getenv("ARTICLES_JSON_PATH", "../articles.json")
+    ARTICLES_JSON_PATH = os.getenv("ARTICLES_JSON_PATH", "articles.json")
 
 config = Config()
