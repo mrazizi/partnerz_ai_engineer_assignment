@@ -71,7 +71,6 @@ class ShopifyStorefrontClient:
         
         products = []
         for product_data in response_products:
-            # Extract variants
             variants = []
             for variant_data in product_data.get("variants", []):
                 if "price_range" in variant_data:
@@ -91,10 +90,8 @@ class ShopifyStorefrontClient:
                 }
                 variants.append(variant)
             
-            # Extract main image
             image_url = product_data.get("image_url", "")
             
-            # Extract price from price_range
             price_range = product_data.get("price_range", {})
             price = float(price_range.get("min", "0.00"))
             currency = price_range.get("currency", "USD")

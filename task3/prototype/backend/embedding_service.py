@@ -18,11 +18,9 @@ class EmbeddingService:
     def _setup_collection(self):
         """Setup Qdrant collection for product embeddings."""
         try:
-            # Check if collection exists
             self.qdrant_client.get_collection(self.collection_name)
             print(f"Collection '{self.collection_name}' already exists")
         except Exception:
-            # Create collection if it doesn't exist
             print(f"Creating collection '{self.collection_name}'")
             self.qdrant_client.create_collection(
                 collection_name=self.collection_name,
@@ -47,7 +45,6 @@ class EmbeddingService:
         title = product.get("title", "")
         description = product.get("description", "")
         
-        # Clean and combine text
         text_parts = []
         if title:
             text_parts.append(f"Title: {title}")
@@ -86,13 +83,10 @@ class EmbeddingService:
             try:
                 print(f"Processing product {i+1}/{len(products)}: {product['title']}")
                 
-                # Generate text for embedding
                 product_text = self.create_product_text(product)
                 
-                # Generate embedding
                 embedding = self.generate_text_embedding(product_text)
                 
-                # Store in Qdrant
                 self.store_product_embedding(product, embedding)
                 
                 processed_count += 1
@@ -110,7 +104,6 @@ class EmbeddingService:
     def search_similar_products(self, product_id: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Find similar products using vector search."""
         try:
-            # First, get the product's embedding
             search_result = self.qdrant_client.scroll(
                 collection_name=self.collection_name,
                 scroll_filter={
@@ -130,7 +123,6 @@ class EmbeddingService:
             
             product_vector = search_result[0][0].vector
             
-            # Search for similar products
             similar_results = self.qdrant_client.search(
                 collection_name=self.collection_name,
                 query_vector=product_vector,

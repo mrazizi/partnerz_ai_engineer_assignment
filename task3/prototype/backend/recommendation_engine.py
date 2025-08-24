@@ -19,17 +19,14 @@ class RecommendationEngine:
     def _load_data(self):
         """Load precomputed data files."""
         try:
-            # Load lift scores
             with open("data/lift_scores.json", "r") as f:
                 self.lift_scores = json.load(f)
             print(f"Loaded lift scores for {len(self.lift_scores)} products")
             
-            # Load co-occurrence data
             with open("data/co_occurrence.json", "r") as f:
                 self.co_occurrence = json.load(f)
             print(f"Loaded co-occurrence data for {len(self.co_occurrence)} products")
             
-            # Load products
             with open("data/products.json", "r") as f:
                 products_list = json.load(f)
                 self.products = {p["id"]: p for p in products_list}
