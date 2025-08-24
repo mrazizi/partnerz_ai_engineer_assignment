@@ -1,216 +1,113 @@
-# Product Recommendation System Prototype
+# Task 3: Product Recommendation System Prototype
 
-This prototype implements the hybrid recommendation system described in `recommendation_design.md`. It combines collaborative filtering and content-based filtering to provide "Customers also bought/viewed" recommendations.
+## Overview
+A hybrid recommendation system that combines collaborative filtering and content-based approaches using vector embeddings, lift scores, and enrichment techniques to provide personalized product recommendations for e-commerce platforms.
 
-## Features
+## Technologies Used
 
-- **Hybrid Recommendation Algorithm**: Combines collaborative filtering (lift scores) with content-based filtering (embeddings)
-- **Real Shopify Data**: Fetches actual product data from Shopify using MCP
-- **Vector Embeddings**: Uses OpenAI text embeddings for content similarity
-- **Interactive Frontend**: Streamlit-based UI showing score breakdowns
-- **Mock Interaction Data**: Generates realistic user interaction patterns
+### Backend
+- **FastAPI**: RESTful API framework for recommendation endpoints
+- **Qdrant**: Vector database for similarity search and embeddings
+- **OpenAI**: Text embeddings (text-embedding-3-small) for content-based filtering
+- **Pandas/NumPy**: Data processing and mathematical operations
+- **Pydantic**: Data validation and request/response models
 
-## Architecture
+### Frontend
+- **Streamlit**: Interactive web interface with data visualization
+- **Plotly**: Interactive charts and score breakdown visualizations
+- **Requests**: HTTP client for backend communication
+
+### Infrastructure
+- **Docker & Docker Compose**: Containerization (Qdrant only)
+- **Uvicorn**: ASGI server for FastAPI
+- **Streamlit Server**: Web server for frontend
+
+## System Architecture
 
 ```
-├── backend/
-│   ├── main.py              # FastAPI server
-│   ├── recommendation_engine.py # Core recommendation logic
-│   ├── embedding_service.py     # OpenAI embeddings + Qdrant
-│   ├── shopify_client.py       # Shopify MCP client
-│   ├── data_fetcher.py         # Data collection & preprocessing
-│   └── config.py               # Configuration
-├── frontend/
-│   └── app.py                  # Streamlit UI
-├── data/                       # Generated data files
-└── docker-compose.yml          # Container orchestration
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Frontend      │    │    Backend      │    │   Qdrant        │
+│   (Streamlit)   │◄──►│   (FastAPI)     │◄──►│   (Vector DB)   │
+│   Port: 8501    │    │   Port: 8000    │    │   Port: 6333    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                              │
+                              ▼
+                       ┌─────────────────┐
+                       │   OpenAI API    │
+                       │ (Embeddings)    │
+                       └─────────────────┘
 ```
 
-## Quick Start
+## Workflow
 
-### Prerequisites
-
-- Docker and Docker Compose
-- OpenAI API key
-- Access to Shopify store (amirtest100.myshopify.com)
-
-### Setup
-
-1. **Clone and navigate to the prototype directory:**
-   ```bash
-   cd task3/prototype
-   ```
-
-2. **Set up environment variables:**
-   ```bash
-   cp backend/env.example backend/.env
-   # Edit backend/.env with your OpenAI API key
-   ```
-
-3. **Start the services:**
-   ```bash
-   docker-compose up -d
-   ```
-
-4. **Run the data pipeline:**
-   ```bash
-   docker-compose exec backend python data_fetcher.py
-   docker-compose exec backend python recommendation_engine.py
-   ```
-
-5. **Access the frontend:**
-   - Frontend: http://localhost:8501
-   - API: http://localhost:8000
-   - Qdrant: http://localhost:6333
-
-## Manual Setup (Development)
-
-### Backend Setup
-
-1. **Install dependencies:**
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-   ```
-
-2. **Set environment variables:**
-   ```bash
-   export OPENAI_API_KEY="your_key_here"
-   export QDRANT_URL="http://localhost:6333"
-   ```
-
-3. **Start Qdrant:**
-   ```bash
-   docker run -p 6333:6333 qdrant/qdrant:latest
-   ```
-
-4. **Run data collection:**
-   ```bash
-   python data_fetcher.py
-   ```
-
-5. **Generate recommendations:**
-   ```bash
-   python recommendation_engine.py
-   ```
-
-6. **Start API server:**
-   ```bash
-   python main.py
-   ```
-
-### Frontend Setup
-
-1. **Install dependencies:**
-   ```bash
-   cd frontend
-   pip install -r requirements.txt
-   ```
-
-2. **Start Streamlit:**
-   ```bash
-   streamlit run app.py
-   ```
-
-## Data Pipeline
-
-The system processes data in the following order:
-
-1. **Product Fetching** (`data_fetcher.py`):
-   - Fetches 500+ products from Shopify using various search terms
-   - Saves to `data/products.json`
-
-2. **Embedding Generation**:
-   - Creates text embeddings for product titles and descriptions
-   - Stores in Qdrant vector database
-
-3. **Interaction Simulation**:
-   - Generates mock user interactions (views, cart adds, purchases)
-   - Saves to `data/interactions.json`
-
-4. **Collaborative Filtering**:
-   - Creates co-occurrence matrix from interactions
-   - Calculates lift scores for product pairs
-   - Saves to `data/co_occurrence.json` and `data/lift_scores.json`
-
-5. **Recommendation Generation**:
-   - Runs hybrid algorithm on all products
-   - Saves results to `data/recommendations.json`
-
-## Algorithm Details
-
-The hybrid recommendation system works as follows:
-
-### 1. Candidate Generation
-- **Collaborative Candidates**: Products with high lift scores relative to target
-- **Content Candidates**: Products with similar embeddings to target
-- **Enrichment Candidates**: Products similar to collaborative candidates
-
-### 2. Scoring Formula
+### 1. Data Pipeline
 ```
-Final Score = w₁ × Lift(A,B) + w₂ × Similarity(A,B) + w₃ × Max_Enrichment(B)
+Shopify Products → Data Fetcher → Embeddings → Qdrant + Precomputed Scores
 ```
 
-Where:
-- `w₁ = 0.4` (collaborative weight)
-- `w₂ = 0.4` (content weight)  
-- `w₃ = 0.2` (enrichment weight)
-
-### 3. Lift Score Calculation
+### 2. Recommendation Generation
 ```
-Lift(A,B) = P(A,B) / (P(A) × P(B))
+Product Query → Collaborative Candidates → Content Candidates → Enrichment → Hybrid Scoring → Top Recommendations
 ```
 
-## API Endpoints
+### 3. Hybrid Algorithm
+1. **Collaborative Filtering**: Uses lift scores from co-occurrence analysis
+2. **Content-Based**: Vector similarity search using product embeddings
+3. **Enrichment**: Products similar to collaborative candidates
+4. **Hybrid Scoring**: Weighted combination of all three approaches
+5. **Ranking**: Final recommendations sorted by hybrid scores
 
-- `GET /` - Health check
-- `GET /products` - List all products
-- `GET /products/{id}` - Get specific product
-- `GET /recommendations/{id}` - Get recommendations for product
-- `GET /recommendations` - Get all precomputed recommendations
-- `GET /stats` - System statistics
-- `POST /generate-recommendations` - Regenerate all recommendations
+## Design Components
 
-## Frontend Features
+### Backend Services
+- **RecommendationEngine**: Core hybrid recommendation logic
+- **EmbeddingService**: OpenAI embeddings and Qdrant vector operations
+- **DataFetcher**: Shopify product data collection
+- **FastAPI Endpoints**: `/recommendations`, `/products`, `/stats`
 
-- **Product Browser**: Select any product to see recommendations
-- **Score Breakdown**: Visual charts showing collaborative vs content contributions
-- **Interaction Counts**: Shows how many users co-purchased items
-- **System Statistics**: Monitor data pipeline and Qdrant status
+### Frontend Features
+- **Product Selection**: Dropdown with product catalog
+- **Recommendation Display**: Rich product cards with score breakdowns
+- **Visual Analytics**: Interactive charts for score components
+- **System Statistics**: Qdrant status and data metrics
 
-## Configuration
+### Data Processing
+- **Lift Scores**: Association rule mining for collaborative filtering
+- **Co-occurrence Matrix**: Product interaction patterns
+- **Vector Embeddings**: Product text representations
+- **Precomputed Recommendations**: Cached results for performance
 
-Key configuration options in `backend/config.py`:
+## How to Run
 
-```python
-COLLABORATIVE_WEIGHT = 0.4      # Weight for lift scores
-CONTENT_WEIGHT = 0.4           # Weight for similarity scores  
-ENRICHMENT_WEIGHT = 0.2        # Weight for enrichment scores
-TOP_N_RECOMMENDATIONS = 5       # Number of final recommendations
-TOP_K_SIMILAR = 10             # Candidates from each method
+### Option 1: Docker (Qdrant only)
+```bash
+cd task3/prototype
+docker-compose up -d
 ```
 
-## Performance Notes
+### Option 2: Manual Start
+```bash
+# Backend
+cd task3/prototype/backend
+uvicorn main:app --host 0.0.0.0 --port 8000
 
-- **Data Collection**: ~5-10 minutes for 500 products
-- **Embedding Generation**: ~10-15 minutes with OpenAI API
-- **Recommendation Generation**: ~2-3 minutes for all products
-- **Vector Search**: Sub-second response times with Qdrant
+# Frontend
+cd task3/prototype/frontend
+streamlit run app.py --server.port 8501
+```
 
-## Limitations
+Access the application at:
+- **Frontend**: http://localhost:8501
+- **Backend API**: http://localhost:8000
+- **Qdrant**: http://localhost:6333/dashboard
 
-This is a prototype with several simplifications:
-
-- Mock interaction data instead of real user behavior
-- Limited to text embeddings (no image embeddings)
-- Simple lift score calculation
-- No real-time recommendation updates
-- Basic collaborative filtering (no matrix factorization)
-
-## Troubleshooting
-
-1. **OpenAI API Errors**: Check API key and rate limits
-2. **Qdrant Connection**: Ensure Qdrant is running on port 6333
-3. **Shopify MCP Errors**: Verify store URL and MCP endpoint
-4. **Empty Recommendations**: Run data pipeline in correct order
-5. **Frontend Errors**: Check backend is running on port 8000
+## Key Features
+- ✅ Hybrid recommendation algorithm
+- ✅ Collaborative filtering with lift scores
+- ✅ Content-based filtering with embeddings
+- ✅ Enrichment techniques
+- ✅ Precomputed recommendations
+- ✅ Real-time scoring breakdown
+- ✅ Interactive data visualization
+- ✅ Vector similarity search
+- ✅ Docker containerization
