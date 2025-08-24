@@ -48,10 +48,8 @@ class ConversationEngine:
         self.shopify_client = ShopifyStorefrontClient()
         self.contexts: Dict[str, ConversationContext] = {}
         
-        # Create tools
         self.tools = self._create_tools()
         
-        # Create agent
         self.agent = self._create_agent()
         self.agent_executor = AgentExecutor(
             agent=self.agent,
@@ -103,7 +101,6 @@ class ConversationEngine:
                     
                     response += "Which one interests you? You can tell me the product name or ID."
                 
-                # Store search results in context for later reference
                 context = self._get_current_context()
                 context.search_results = products
                 context.search_query = query
@@ -145,7 +142,6 @@ class ConversationEngine:
                 logger.info(f"Product Reference: {product_reference}")
                 logger.info(f"Quantity: {quantity}")
                 
-                # Get or create cart
                 context = self._get_current_context()
                 if not context.cart_id:
                     cart_id = self.shopify_client.create_cart()
@@ -163,7 +159,6 @@ class ConversationEngine:
                 
                 logger.info(f"Resolved to variant ID: {variant_id}")
                 
-                # Add to cart
                 result = self.shopify_client.add_to_cart(cart_id, variant_id, quantity)
                 
                 logger.info(f"Added to cart successfully")
@@ -185,14 +180,11 @@ class ConversationEngine:
                 
                 cart = self.shopify_client.get_cart(context.cart_id)
                 
-                # Handle different response structures
                 cart_lines = []
                 if "lines" in cart:
                     if isinstance(cart["lines"], dict) and "edges" in cart["lines"]:
-                        # GraphQL-style response
                         cart_lines = cart["lines"]["edges"]
                     elif isinstance(cart["lines"], list):
-                        # Direct array response
                         cart_lines = cart["lines"]
                 
                 if not cart_lines:
@@ -202,9 +194,7 @@ class ConversationEngine:
                 total = 0.0
                 
                 for line in cart_lines:
-                    # Handle different line structures
                     if isinstance(line, dict) and "node" in line:
-                        # GraphQL-style with node
                         node = line["node"]
                         merchandise = node.get("merchandise", {})
                         product_title = merchandise.get("product", {}).get("title", "Unknown Product")
@@ -214,7 +204,6 @@ class ConversationEngine:
                         price = float(price_data.get("amount", 0))
                         currency = price_data.get("currencyCode", "USD")
                     else:
-                        # Direct line structure
                         merchandise = line.get("merchandise", {})
                         product_title = merchandise.get("product", {}).get("title", "Unknown Product")
                         variant_title = merchandise.get("title", "")
@@ -418,8 +407,6 @@ class ConversationEngine:
     
     def _get_current_context(self) -> ConversationContext:
         """Get the current conversation context (for tools to access)."""
-        # This is a simple implementation - in production you'd want to pass context properly
-        # For now, we'll use a global context or session-based approach
         if not hasattr(self, '_current_session_id'):
             return ConversationContext()
         
@@ -440,14 +427,8 @@ class ConversationEngine:
         self._current_session_id = session_id
         
         try:
-            logger.info(f"=== PROCESSING MESSAGE ===")
-            logger.info(f"Session ID: {session_id}")
-            logger.info(f"User message: {user_message}")
-            
-            # Convert conversation history to LangChain format
             chat_history = context.conversation_history[:-1]  # Exclude the current message
             
-            # Run the agent
             result = self.agent_executor.invoke({
                 "input": user_message,
                 "chat_history": chat_history
@@ -455,11 +436,7 @@ class ConversationEngine:
             
             response = result["output"]
             
-            # Add bot response to history
             context.add_message(AIMessage(content=response))
-            
-            logger.info(f"=== RESPONSE GENERATED ===")
-            logger.info(f"Bot response: {response}")
             
             return response
             

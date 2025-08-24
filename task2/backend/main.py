@@ -8,7 +8,6 @@ from conversation_engine import ConversationEngine
 from shopify_client import ShopifyStorefrontClient
 import logging
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -18,7 +17,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,7 +25,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize conversation engine
 conversation_engine = ConversationEngine()
 shopify_client = ShopifyStorefrontClient()
 
@@ -126,18 +123,10 @@ async def list_mcp_tools():
 async def chat(chat_message: ChatMessage):
     """Main chat endpoint for conversational interactions."""
     try:
-        # Generate session ID if not provided
         session_id = chat_message.session_id or str(uuid.uuid4())
-        
-        logger.info(f"=== CHAT REQUEST ===")
-        logger.info(f"Session ID: {session_id}")
-        logger.info(f"User message: {chat_message.message}")
         
         # Process the message through conversation engine
         response = conversation_engine.process_message(session_id, chat_message.message)
-        
-        logger.info(f"=== CHAT RESPONSE ===")
-        logger.info(f"Bot response: {response}")
         
         return ChatResponse(
             response=response,
@@ -239,7 +228,7 @@ async def remove_from_cart(cart_id: str, line_id: str):
 async def get_cart(cart_id: str):
     """Get cart contents."""
     try:
-        # Decode URL-encoded cart_id
+            # Decode URL-encoded cart_id
         import urllib.parse
         decoded_cart_id = urllib.parse.unquote(cart_id)
         
@@ -257,7 +246,6 @@ async def get_conversation_history(session_id: str):
     try:
         context = conversation_engine.get_or_create_context(session_id)
         
-        # Convert LangChain messages to simple format for API response
         conversation_history = []
         for message in context.conversation_history:
             if hasattr(message, 'content'):

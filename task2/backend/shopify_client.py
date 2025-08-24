@@ -50,7 +50,6 @@ class ShopifyStorefrontClient:
         # Shopify's built-in MCP server endpoint for this store
         self.mcp_endpoint = f"https://{self.store_url}/api/mcp"
         
-        # Standard MCP headers
         self.headers = {
             "Content-Type": "application/json"
         }
@@ -91,7 +90,6 @@ class ShopifyStorefrontClient:
     def search_products(self, query: str, limit: int = 10) -> List[Product]:
         """Search for products using Shopify's Storefront MCP server."""
         
-        # Use the search_shop_catalog tool as per Shopify MCP documentation
         tool_name = "search_shop_catalog"
         arguments = {
             "query": query,
@@ -100,20 +98,12 @@ class ShopifyStorefrontClient:
         
         response = self._make_mcp_tool_request(tool_name, arguments)
         response_products = json.loads(response["content"][0]["text"])["products"]
-        
-
-        # print("==============================================")
-        # print(type(response_products))
-        # print(response_products)
-        # print("==============================================")
 
         products = []
 
         for product_data in response_products:
-            # Extract variants
             variants = []
             for variant_data in product_data.get("variants", []):
-                # Handle price from variant's price_range if available
                 if "price_range" in variant_data:
                     variant_price = float(variant_data["price_range"].get("min", "0.00"))
                     variant_currency = variant_data["price_range"].get("currency", "USD")
@@ -131,10 +121,8 @@ class ShopifyStorefrontClient:
                 }
                 variants.append(variant)
             
-            # Extract images
             image_url = product_data.get("image_url", [])
             
-            # Extract price from price_range
             price_range = product_data.get("price_range", {})
             price = float(price_range.get("min", "0.00"))
             currency = price_range.get("currency", "USD")
@@ -155,7 +143,6 @@ class ShopifyStorefrontClient:
     
     def get_product_by_id(self, product_id: str) -> Optional[Product]:
         """Get a specific product by ID using search (no direct get product tool in MCP)."""
-        # Use search with product ID as context
         arguments = {
             "query": product_id,
             "context": f"Looking for specific product with ID: {product_id}"
@@ -164,13 +151,10 @@ class ShopifyStorefrontClient:
         response = self._make_mcp_tool_request("search_shop_catalog", arguments)
         response_products = json.loads(response["content"][0]["text"])["products"]
         
-        # Find the product with matching ID
         for product_data in response_products:
             if product_data.get("product_id") == product_id or any(v.get("variant_id") == product_id for v in product_data.get("variants", [])):
-                # Process similar to search_products
                 variants = []
                 for variant_data in product_data.get("variants", []):
-                    # Handle price from variant's price_range if available
                     if "price_range" in variant_data:
                         variant_price = float(variant_data["price_range"].get("min", "0.00"))
                         variant_currency = variant_data["price_range"].get("currency", "USD")
@@ -190,7 +174,6 @@ class ShopifyStorefrontClient:
                 
                 images = product_data.get("images", [])
                 
-                # Extract price from price_range
                 price_range = product_data.get("price_range", {})
                 price = float(price_range.get("min", "0.00"))
                 currency = price_range.get("currency", "USD")
@@ -212,27 +195,23 @@ class ShopifyStorefrontClient:
         """Create a new cart using Shopify MCP update_cart tool."""
         # Create new cart by calling update_cart without cart_id
         response = self._make_mcp_tool_request("update_cart", {
-            "add_items": []  # Empty add_items array creates new cart
+            "add_items": []
         })
         
         print("=== CREATE CART RESPONSE ===")
         print(response)
         print("=============================")
         
-        # Parse the MCP response structure
         if "content" in response and len(response["content"]) > 0:
-            # Parse JSON content from MCP response
             content = json.loads(response["content"][0]["text"])
             if "cart" in content and "id" in content["cart"]:
                 return content["cart"]["id"]
         
-        # Fallback to other possible structures
         if "cart_id" in response:
             return response["cart_id"]
         elif "cart" in response:
             return response["cart"].get("id")
         else:
-            # Return None if no cart_id found
             return None
     
     def add_to_cart(self, cart_id: str, variant_id: str, quantity: int = 1) -> Dict[str, Any]:
@@ -244,13 +223,6 @@ class ShopifyStorefrontClient:
                 "quantity": quantity
             }]
         }
-        
-        print("=== ADD TO CART REQUEST ===")
-        print(f"Cart ID: {cart_id}")
-        print(f"Variant ID: {variant_id}")
-        print(f"Quantity: {quantity}")
-        print(f"Arguments: {arguments}")
-        print("===========================")
         
         response = self._make_mcp_tool_request("update_cart", arguments)
         
@@ -276,7 +248,6 @@ class ShopifyStorefrontClient:
         }
         response = self._make_mcp_tool_request("update_cart", arguments)
         
-        # Parse the MCP response structure
         if "content" in response and len(response["content"]) > 0:
             content = json.loads(response["content"][0]["text"])
             return content
@@ -288,7 +259,6 @@ class ShopifyStorefrontClient:
         arguments = {"cart_id": cart_id}
         response = self._make_mcp_tool_request("get_cart", arguments)
         
-        # Parse the MCP response structure
         if "content" in response and len(response["content"]) > 0:
             content = json.loads(response["content"][0]["text"])
             return content
