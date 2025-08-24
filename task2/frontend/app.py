@@ -78,15 +78,7 @@ st.markdown("""
         background-color: #ffcdd2;
         color: #c62828;
     }
-    .cart-item {
-        background-color: #fff3e0;
-        color: #333333;
-        padding: 0.75rem;
-        border-radius: 0.5rem;
-        margin: 0.25rem 0;
-        border-left: 4px solid #ff9800;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
+
     .message-text {
         color: inherit;
         font-weight: 500;
@@ -108,6 +100,15 @@ st.markdown("""
         font-size: 0.9rem;
         line-height: 1.4;
     }
+    .bot-message a {
+        color: #1976d2;
+        text-decoration: underline;
+        font-weight: 500;
+    }
+    .bot-message a:hover {
+        color: #1565c0;
+        text-decoration: none;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -120,8 +121,7 @@ def initialize_session_state():
     if 'conversation_history' not in st.session_state:
         st.session_state.conversation_history = []
     
-    if 'cart_id' not in st.session_state:
-        st.session_state.cart_id = None
+
     
     if 'backend_connected' not in st.session_state:
         st.session_state.backend_connected = False
@@ -203,21 +203,7 @@ def search_products(query: str, limit: int = 10):
         return {"error": str(e)}
 
 
-def get_cart_contents():
-    """Get cart contents if cart exists."""
-    if not st.session_state.cart_id:
-        return None
-    
-    try:
-        response = requests.get(
-            f"{BACKEND_URL}/cart/{st.session_state.cart_id}",
-            timeout=10
-        )
-        if response.status_code == 200:
-            return response.json()
-        return None
-    except Exception:
-        return None
+
 
 
 def display_chat_history():
@@ -231,102 +217,15 @@ def display_chat_history():
                 if message["role"] == "user":
                     st.markdown(f'<div class="user-message"><strong>You:</strong> {message["content"]}</div>', unsafe_allow_html=True)
                 else:
-                    st.markdown(f'<div class="bot-message"><strong>Assistant:</strong> {message["content"]}</div>', unsafe_allow_html=True)
+                    # Convert markdown links to HTML for proper rendering
+                    content = message["content"]
+                    # Convert markdown links [text](url) to HTML links
+                    import re
+                    content = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2" target="_blank">\1</a>', content)
+                    st.markdown(f'<div class="bot-message"><strong>Assistant:</strong> {content}</div>', unsafe_allow_html=True)
 
 
-def display_product_search():
-    """Display product search interface."""
-    st.markdown("### 🔍 Quick Product Search")
-    
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        search_query = st.text_input(
-            "Search for products:",
-            placeholder="e.g., red shirt, running shoes, etc.",
-            key="search_input"
-        )
-    
-    with col2:
-        search_button = st.button("Search", type="primary")
-    
-    if search_button and search_query:
-        with st.spinner("Searching products..."):
-            results = search_products(search_query)
-            
-            if "error" in results:
-                st.error(f"Search failed: {results['error']}")
-            else:
-                products = results.get("products", [])
-                if products:
-                    st.success(f"Found {len(products)} products:")
-                    
-                    # Display products in a grid
-                    for i in range(0, len(products), 2):
-                        cols = st.columns(2)
-                        for j, col in enumerate(cols):
-                            if i + j < len(products):
-                                product = products[i + j]
-                                with col:
-                                    with st.container():
-                                        st.markdown(f'<div class="product-card">', unsafe_allow_html=True)
-                                        st.markdown(f"**{product['title']}**")
-                                        st.markdown(f"Price: ${product['price']:.2f}")
-                                        if product['description']:
-                                            st.markdown(f"{product['description'][:100]}...")
-                                        
-                                        # Show availability
-                                        if True:  # Default to available since we removed the field
-                                            st.markdown('<span class="status-indicator status-connected">In Stock</span>', unsafe_allow_html=True)
-                                        else:
-                                            st.markdown('<span class="status-indicator status-error">Out of Stock</span>', unsafe_allow_html=True)
-                                        
-                                        st.markdown('</div>', unsafe_allow_html=True)
-                else:
-                    st.warning("No products found for your search.")
 
-
-def display_cart_summary():
-    """Display cart summary in sidebar."""
-    cart_data = get_cart_contents()
-    
-    if cart_data and cart_data.get("cart"):
-        cart = cart_data["cart"]
-        cart_lines = cart.get("lines", {}).get("edges", [])
-        
-        if cart_lines:
-            st.markdown("### 🛒 Your Cart")
-            
-            total = 0.0
-            for line in cart_lines:
-                node = line["node"]
-                merchandise = node["merchandise"]
-                product_title = merchandise["product"]["title"]
-                variant_title = merchandise["title"]
-                quantity = node["quantity"]
-                price = float(merchandise["price"]["amount"])
-                
-                line_total = price * quantity
-                total += line_total
-                
-                st.markdown(f'''
-                <div class="cart-item">
-                    <strong>{product_title}</strong><br>
-                    {variant_title}<br>
-                    Qty: {quantity} × ${price:.2f} = ${line_total:.2f}
-                </div>
-                ''', unsafe_allow_html=True)
-            
-            st.markdown(f"**Total: ${total:.2f}**")
-            
-            if st.button("🗑️ Clear Cart"):
-                if clear_conversation():
-                    st.rerun()
-        else:
-            st.markdown("### 🛒 Your Cart")
-            st.write("Your cart is empty")
-    else:
-        st.markdown("### 🛒 Your Cart")
-        st.write("Your cart is empty")
 
 
 def main():
@@ -347,12 +246,6 @@ def main():
         else:
             st.markdown('<span class="status-indicator status-error">❌ Backend Disconnected</span>', unsafe_allow_html=True)
             st.warning("Please ensure the backend server is running and accessible")
-        
-        st.markdown("---")
-        
-        # Display cart summary
-        if backend_connected:
-            display_cart_summary()
         
         st.markdown("---")
         
@@ -389,51 +282,45 @@ def main():
         st.code("cd task2/backend && python run.py", language="bash")
         return
     
-    # Chat interface
-    col1, col2 = st.columns([2, 1])
+    # Chat interface - Full width
+    # Display conversation history
+    display_chat_history()
     
-    with col1:
-        # Display conversation history
-        display_chat_history()
+    # Chat input
+    st.markdown("### 💭 Chat with Assistant")
+    
+    # Create a form for better UX
+    with st.form("chat_form", clear_on_submit=True):
+        user_input = st.text_area(
+            "Type your message:",
+            height=100,
+            placeholder="Ask me about products, sizes, colors, or cart management...",
+            key="user_message"
+        )
         
-        # Chat input
-        st.markdown("### 💭 Chat with Assistant")
+        col_send, col_clear = st.columns([1, 1])
         
-        # Create a form for better UX
-        with st.form("chat_form", clear_on_submit=True):
-            user_input = st.text_area(
-                "Type your message:",
-                height=100,
-                placeholder="Ask me about products, sizes, colors, or cart management...",
-                key="user_message"
-            )
-            
-            col_send, col_clear = st.columns([1, 1])
-            
-            with col_send:
-                send_button = st.form_submit_button("Send Message", type="primary")
-            
-            with col_clear:
-                clear_button = st.form_submit_button("Clear Chat")
+        with col_send:
+            send_button = st.form_submit_button("Send Message", type="primary")
         
-        # Process user input
-        if send_button and user_input.strip():
-            with st.spinner("Thinking..."):
-                response = send_chat_message(user_input.strip())
-                
-                # Add to conversation history
-                st.session_state.conversation_history.append({"role": "user", "content": user_input.strip()})
-                st.session_state.conversation_history.append({"role": "assistant", "content": response})
+        with col_clear:
+            clear_button = st.form_submit_button("Clear Chat")
+    
+    # Process user input
+    if send_button and user_input.strip():
+        with st.spinner("Thinking..."):
+            response = send_chat_message(user_input.strip())
             
+            # Add to conversation history
+            st.session_state.conversation_history.append({"role": "user", "content": user_input.strip()})
+            st.session_state.conversation_history.append({"role": "assistant", "content": response})
+        
+        st.rerun()
+    
+    if clear_button:
+        if clear_conversation():
             st.rerun()
-        
-        if clear_button:
-            if clear_conversation():
-                st.rerun()
     
-    with col2:
-        # Product search interface
-        display_product_search()
     
     # Footer
     st.markdown("---")

@@ -161,8 +161,32 @@ class ConversationEngine:
                 
                 result = self.shopify_client.add_to_cart(cart_id, variant_id, quantity)
                 
+                # Extract cart_id from the response to ensure it's properly stored
+                if isinstance(result, dict) and "cart" in result and "id" in result["cart"]:
+                    actual_cart_id = result["cart"]["id"]
+                    context.cart_id = actual_cart_id
+                    logger.info(f"Updated cart_id from response: {actual_cart_id}")
+                
+                # Extract checkout URL from the response
+                checkout_url = None
+                if isinstance(result, dict) and "cart" in result:
+                    cart_data = result["cart"]
+                    if "checkout_url" in cart_data:
+                        checkout_url = cart_data["checkout_url"]
+                    elif "checkoutUrl" in cart_data:
+                        checkout_url = cart_data["checkoutUrl"]
+                
+                response_msg = f"Perfect! I've added the product to your cart (Cart ID: {context.cart_id})."
+                
+                if checkout_url:
+                    response_msg += f"\n\n🛒 **Cart Link**: {checkout_url}"
+                    response_msg += "\n\nYou can use this link to complete your purchase, or continue shopping with me!"
+                else:
+                    response_msg += " Is there anything else you'd like to add?"
+                
                 logger.info(f"Added to cart successfully")
-                return f"Perfect! I've added the product to your cart. Is there anything else you'd like to add?"
+                logger.info(f"Final cart_id in context: {context.cart_id}")
+                return response_msg
                 
             except Exception as e:
                 logger.error(f"Add to cart error: {str(e)}")
@@ -175,17 +199,25 @@ class ConversationEngine:
                 logger.info("=== VIEW CART TOOL ===")
                 
                 context = self._get_current_context()
+                logger.info(f"Current cart_id in context: {context.cart_id}")
+                
                 if not context.cart_id:
                     return "Your cart is empty. Would you like to search for some products?"
                 
-                cart = self.shopify_client.get_cart(context.cart_id)
+                cart_response = self.shopify_client.get_cart(context.cart_id)
+                logger.info(f"Cart response: {cart_response}")
+                
+                # Handle the cart response structure
+                cart_data = cart_response
+                if "cart" in cart_response:
+                    cart_data = cart_response["cart"]
                 
                 cart_lines = []
-                if "lines" in cart:
-                    if isinstance(cart["lines"], dict) and "edges" in cart["lines"]:
-                        cart_lines = cart["lines"]["edges"]
-                    elif isinstance(cart["lines"], list):
-                        cart_lines = cart["lines"]
+                if "lines" in cart_data:
+                    if isinstance(cart_data["lines"], dict) and "edges" in cart_data["lines"]:
+                        cart_lines = cart_data["lines"]["edges"]
+                    elif isinstance(cart_data["lines"], list):
+                        cart_lines = cart_data["lines"]
                 
                 if not cart_lines:
                     return "Your cart is empty. Would you like to search for some products?"
@@ -195,6 +227,7 @@ class ConversationEngine:
                 
                 for line in cart_lines:
                     if isinstance(line, dict) and "node" in line:
+                        # GraphQL structure with edges/nodes
                         node = line["node"]
                         merchandise = node.get("merchandise", {})
                         product_title = merchandise.get("product", {}).get("title", "Unknown Product")
@@ -204,13 +237,22 @@ class ConversationEngine:
                         price = float(price_data.get("amount", 0))
                         currency = price_data.get("currencyCode", "USD")
                     else:
+                        # Direct structure from MCP response
                         merchandise = line.get("merchandise", {})
                         product_title = merchandise.get("product", {}).get("title", "Unknown Product")
                         variant_title = merchandise.get("title", "")
                         quantity = line.get("quantity", 1)
-                        price_data = merchandise.get("price", {})
-                        price = float(price_data.get("amount", 0))
-                        currency = price_data.get("currencyCode", "USD")
+                        
+                        # Handle cost structure from MCP response
+                        cost_data = line.get("cost", {})
+                        if "total_amount" in cost_data:
+                            price_amount = cost_data["total_amount"].get("amount", "0")
+                            price = float(price_amount) / quantity if quantity > 0 else 0
+                            currency = cost_data["total_amount"].get("currency", "USD")
+                        else:
+                            price_data = merchandise.get("price", {})
+                            price = float(price_data.get("amount", 0))
+                            currency = price_data.get("currencyCode", "USD")
                     
                     line_total = price * quantity
                     total += line_total
@@ -218,7 +260,19 @@ class ConversationEngine:
                     cart_summary += f"• {product_title} ({variant_title}) - Qty: {quantity} - ${line_total:.2f}\n"
                 
                 cart_summary += f"\nTotal: ${total:.2f}"
-                cart_summary += "\n\nWould you like to add more items or make any changes?"
+                
+                # Extract checkout URL from cart response
+                checkout_url = None
+                if "checkout_url" in cart_data:
+                    checkout_url = cart_data["checkout_url"]
+                elif "checkoutUrl" in cart_data:
+                    checkout_url = cart_data["checkoutUrl"]
+                
+                if checkout_url:
+                    cart_summary += f"\n\n🛒 **Cart Link**: {checkout_url}"
+                    cart_summary += "\n\nYou can use this link to complete your purchase, or continue shopping with me!"
+                else:
+                    cart_summary += "\n\nWould you like to add more items or make any changes?"
                 
                 logger.info(f"Cart viewed successfully")
                 return cart_summary

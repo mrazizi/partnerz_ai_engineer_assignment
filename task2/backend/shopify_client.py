@@ -241,10 +241,7 @@ class ShopifyStorefrontClient:
         """Remove item from cart using Shopify MCP update_cart tool."""
         arguments = {
             "cart_id": cart_id,
-            "update_items": [{
-                "id": line_item_id,
-                "quantity": 0  # Set quantity to 0 to remove item
-            }]
+            "remove_line_ids": [line_item_id]  # Use remove_line_ids for explicit removal
         }
         response = self._make_mcp_tool_request("update_cart", arguments)
         
